@@ -1,9 +1,12 @@
 const mongoose = require('mongoose');
 
 const SessionSchema = new mongoose.Schema({
-    sessionId: {type:String,required},
-    userId: {type:mongoose.Types.ObjectId,required},
-    username: {type:String,required}
+    sessionId: { type: String, required:true },
+    userId: { type: mongoose.Types.ObjectId, required:true },
+    username: { type: String, required:true },
+    connected: { type: Boolean, default: true },
+}, {
+    timestamps: true
 });
 
 const session = mongoose.model('session', SessionSchema);
