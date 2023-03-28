@@ -27,6 +27,23 @@ class MatchStore {
             throw new Error(err.message)
         }
     }
+
+    async createRightSwipe(swipedByUserId, swipedOnUserId) {
+        try {
+            const swipe = await Swipe.create({
+                swipedBy: swipedByUserId,
+                swipedOn: swipedOnUserId,
+                swiped: "right"
+            });
+
+            return swipe;
+        } catch (err) {
+            throw new Error(err.message)
+        }
+
+    }
+
 }
+
 
 module.exports = new MatchStore();
