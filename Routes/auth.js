@@ -30,7 +30,7 @@ router.post('/signin', async (req, res) => {
             console.log(req.session);
             req.session.userid = user._id;
             req.session.token = token
-            res.json({ status: 'ok' });
+            res.json({ status: 'ok',token:token,userId:user._id,username:user.username });
         }
         else {
             console.log(err)
