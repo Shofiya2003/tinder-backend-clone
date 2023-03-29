@@ -5,7 +5,7 @@ const Developer = require('../models/userInfo');
 
 const authMiddleware = require('../middleware/auth')
 
-const { get, post, patch } = require('../Controllers/developer');
+const { get, post, patch } = require('../Controllers/user');
 
 router.get('/', authMiddleware, (req, res) => {
     return res.json({ status: "ok" })
