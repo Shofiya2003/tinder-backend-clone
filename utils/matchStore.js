@@ -38,9 +38,22 @@ class MatchStore {
 
             return swipe;
         } catch (err) {
+            throw new Error(err.message);
+        }
+    }
+
+    async createLeftSwipe(swipedByUserId, swipedOnUserId) {
+        try {
+            const swipe = await Swipe.create({
+                swipedBy: swipedByUserId,
+                swipedOn: swipedOnUserId,
+                swiped: "left"
+            });
+
+            return swipe;
+        } catch (err) {
             throw new Error(err.message)
         }
-
     }
 
 }

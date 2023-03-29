@@ -41,8 +41,8 @@ const io = new Server(httpServer, { /* options */ });
 io.use(async (socket, next) => {
     try {
 
-        const sessionId = socket.handshake.auth.sessionId;
-        const token = socket.handshake.auth.token;
+        const sessionId = socket.handshake.headers.sessionid;
+        const token = socket.handshake.headers.token;
 
         // //verify the jwt token
         // if (!token || !jwt.verify(token, process.env.JWT_SECRET)) {
@@ -54,7 +54,9 @@ io.use(async (socket, next) => {
             //find the session in the db
             const session = await sessionStore.findSession(sessionId);
             if (session) {
-
+                socket.sessionId = session.sessionId
+                socket.userId = session.userId;
+                socket.username = session.username;
                 return next();
             }
         }
@@ -110,8 +112,7 @@ io.on("connection", (socket) => {
                 username: socket.username
             })
         }
-        console.log(socket.userId)
-        console.log(swipedUserId)
+
         await matchStore.createRightSwipe(socket.userId, swipedUserId);
         socket.emit("response", {
             status: "ok"
@@ -120,11 +121,12 @@ io.on("connection", (socket) => {
     })
 
     //listen for swipe left
-    socket.on("swiped left", (swipedUserId, swipedUsername) => {
-        //add left swipe to the db
-
+    socket.on("swiped left", async ({swipedUserId}) => {
+        await matchStore.createRightSwipe(socket.userId, swipedUserId);
+        socket.emit("response", {
+            status: "ok"
+        })
     })
-
 
     console.log("connected")
 });
