@@ -4,7 +4,7 @@ const router=express.Router();
 
 // importing the authentication route
 const auth=require('./auth');
-const user = require('./developer')
+const user = require('./user')
 
 
 router.use('/auth',auth);

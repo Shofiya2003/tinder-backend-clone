@@ -122,7 +122,7 @@ io.on("connection", (socket) => {
 
     //listen for swipe left
     socket.on("swiped left", async ({swipedUserId}) => {
-        await matchStore.createRightSwipe(socket.userId, swipedUserId);
+        await matchStore.createLeftSwipe(socket.userId, swipedUserId);
         socket.emit("response", {
             status: "ok"
         })
