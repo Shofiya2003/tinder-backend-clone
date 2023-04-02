@@ -28,16 +28,17 @@ router.post('/signin', async (req, res) => {
             }, process.env.JWT_SECRET)
             console.log(user);
             console.log(req.session);
-            req.session.userid = user._id;
+            req.session.userId = user._id;
             req.session.token = token
             res.json({ status: 'ok',token:token,userId:user._id,username:user.username });
         }
         else {
-            console.log(err)
+           
             res.status(400).json({ status: 'error', error: 'Invalid username or password' });
         }
     } catch (err) {
-        return res.status(500).json({ status: 'error', msg: err.msg })
+        console.log(err);
+        return res.status(500).json({ status: 'error', msg: err.message })
     }
 
 })
@@ -59,7 +60,7 @@ router.post('/signup', async (req, res) => {
         }, process.env.JWT_SECRET)
         console.log(user);
         console.log(req.session);
-        req.session.userid = user._id;
+        req.session.userId = user._id;
         req.session.token = token
         return res.json({ status: 'ok' });
     } catch (err) {

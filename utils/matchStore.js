@@ -56,6 +56,16 @@ class MatchStore {
         }
     }
 
+    async getMatches(userId) {
+        try {
+            const matches = await Match.find({ "$or": [{ userId1: userId }, { userId2: userId }] });
+            return matches
+
+        } catch (err) {
+            throw new Error(err.message)
+        }
+    }
+
 }
 
 

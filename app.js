@@ -13,8 +13,11 @@ const api = require('./Routes/api');
 
 const sessionStore = require('./utils/sessionStore')
 const matchStore = require('./utils/matchStore')
+const messageStore = require('./utils/messageStore')
+const User = require('./models/user')
 
 const cors = require('cors');
+const message = require('./models/message');
 require('dotenv').config()
 
 
@@ -88,7 +91,7 @@ io.use(async (socket, next) => {
 
 })
 
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
     //send connection details to the client
     socket.emit("session", {
         sessionId: socket.sessionId,
@@ -96,7 +99,48 @@ io.on("connection", (socket) => {
     })
 
     //join room named after the userID
-    socket.join(socket.userId);
+    socket.join(`room-${socket.userId}`);
+    console.log(socket.userId + " joined the room")
+
+    const users = [];
+    const messagesPerUser = new Map();
+    const messages = await messageStore.getAllUserMessages(socket.userId)
+    messages.forEach(message => {
+        let { to, from } = message;
+        to = to.toString();
+        from = from.toString();
+        console.log(socket.userId.equals(from))
+        const otherUser = socket.userId.equals(from) ? to : from;
+        console.log(otherUser + " otherUser");
+        if (messagesPerUser.has(otherUser)) {
+            messagesPerUser.get(otherUser).push(message);
+        } else {
+            messagesPerUser.set(otherUser, [message]);
+        }
+    })
+    console.log(messagesPerUser)
+    const matches = await matchStore.getMatches(socket.userId);
+    console.log(matches);
+    await Promise.all(matches.map(async match => {
+        let { userId1, userId2 } = match;
+        userId1 = userId1.toString();
+        userId2 = userId2.toString();
+        const otherUser = socket.userId.equals(userId1) ? userId2 : userId1;
+        console.log(otherUser);
+        const { username } = await User.findOne({ _id: otherUser }, { username: 1 });
+        console.log(username);
+        users.push({
+            userId: otherUser,
+            username: username,
+            messages: messagesPerUser.get(otherUser),
+        })
+
+    }))
+
+    console.log(users);
+
+    socket.emit("chats", users)
+
 
     //listen for swipe right
     socket.on("swiped right", async ({ swipedUserId, swipedUsername }) => {
@@ -105,12 +149,13 @@ io.on("connection", (socket) => {
         console.log(match);
         if (match) {
             await matchStore.createMatch({ userId1: socket.userId, userId2: swipedUserId })
+            socket.to(`room-${swipedUserId}`).emit("match", {
+                username: socket.username
+            })
             socket.emit("match", {
                 username: swipedUsername
             })
-            socket.to(swipedUserId).emit("match", {
-                username: socket.username
-            })
+
         }
 
         await matchStore.createRightSwipe(socket.userId, swipedUserId);
@@ -121,11 +166,31 @@ io.on("connection", (socket) => {
     })
 
     //listen for swipe left
-    socket.on("swiped left", async ({swipedUserId}) => {
+    socket.on("swiped left", async ({ swipedUserId }) => {
         await matchStore.createLeftSwipe(socket.userId, swipedUserId);
         socket.emit("response", {
             status: "ok"
         })
+    })
+
+    socket.on("private message", async ({ content, to }) => {
+
+        //check match
+        const message = {
+            from: socket.userId,
+            to: to,
+            message: content
+        }
+        console.log(to);
+        socket.to(`room-${to}`).emit("private message", message)
+
+        socket.emit("private message", message)
+        await messageStore.createMessage(socket.userId, to, content)
+
+    })
+
+    socket.on("disconnect", (reason) => {
+        console.log(`socket disconnected due to ${reason}`)
     })
 
     console.log("connected")
