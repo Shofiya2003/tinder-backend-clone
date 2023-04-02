@@ -66,6 +66,15 @@ class MatchStore {
         }
     }
 
+    async getMatchesNotNotified(userId, lastActive) {
+        try {
+            const matches = await Match.find({ "$or": [{ userId1: userId }, { userId2: userId }], createdAt: { '$gte': lastActive } });
+            return matches
+        } catch (err) {
+            throw new Error(err.message)
+        }
+    }
+
 }
 
 

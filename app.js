@@ -15,6 +15,7 @@ const sessionStore = require('./utils/sessionStore')
 const matchStore = require('./utils/matchStore')
 const messageStore = require('./utils/messageStore')
 const User = require('./models/user')
+const userStore = require('./utils/userStore')
 
 const cors = require('cors');
 const message = require('./models/message');
@@ -102,43 +103,27 @@ io.on("connection", async (socket) => {
     socket.join(`room-${socket.userId}`);
     console.log(socket.userId + " joined the room")
 
-    const users = [];
-    const messagesPerUser = new Map();
-    const messages = await messageStore.getAllUserMessages(socket.userId)
-    messages.forEach(message => {
-        let { to, from } = message;
-        to = to.toString();
-        from = from.toString();
-        console.log(socket.userId.equals(from))
-        const otherUser = socket.userId.equals(from) ? to : from;
-        console.log(otherUser + " otherUser");
-        if (messagesPerUser.has(otherUser)) {
-            messagesPerUser.get(otherUser).push(message);
-        } else {
-            messagesPerUser.set(otherUser, [message]);
-        }
-    })
-    console.log(messagesPerUser)
-    const matches = await matchStore.getMatches(socket.userId);
-    console.log(matches);
-    await Promise.all(matches.map(async match => {
-        let { userId1, userId2 } = match;
-        userId1 = userId1.toString();
-        userId2 = userId2.toString();
-        const otherUser = socket.userId.equals(userId1) ? userId2 : userId1;
-        console.log(otherUser);
-        const { username } = await User.findOne({ _id: otherUser }, { username: 1 });
-        console.log(username);
-        users.push({
-            userId: otherUser,
-            username: username,
-            messages: messagesPerUser.get(otherUser),
+    //get matches not notified
+    const { lastActive } = await User.findOne({ _id: socket.userId }, { lastActive: 1 });
+    console.log(lastActive)
+    const unotifiedMatches = await matchStore.getMatchesNotNotified(socket.userId, lastActive);
+    console.log(unotifiedMatches)
+    if (unotifiedMatches) {
+
+        unotifiedMatches.forEach(async match => {
+            let { userId1, userId2 } = match;
+            userId1 = userId1.toString();
+            userId2 = userId2.toString();
+            const otherUser = socket.userId.equals(userId1) ? userId2 : userId1;
+            const { username } = await User.findOne({ _id: otherUser }, { username: 1 });
+            socket.emit("match", {
+                username: username,
+                userId: otherUser
+            })
         })
+    }
 
-    }))
-
-    console.log(users);
-
+    const users = await getUserMessages(socket.userId);
     socket.emit("chats", users)
 
 
@@ -189,7 +174,11 @@ io.on("connection", async (socket) => {
 
     })
 
-    socket.on("disconnect", (reason) => {
+    socket.on("disconnect", async (reason) => {
+
+        const now = new Date().toISOString();
+
+        await userStore.updateUser(socket.userId, { lastActive: now })
         console.log(`socket disconnected due to ${reason}`)
     })
 
@@ -200,6 +189,48 @@ io.on("connection", async (socket) => {
 mongoose.connect('mongodb://localhost:27017/findyoursimrandatabase', () => {
     console.log("connected to db");
 });
+
+const getUserMessages = async (userId) => {
+    const users = [];
+    const messagesPerUser = new Map();
+    const messages = await messageStore.getAllUserMessages(userId)
+
+    messages.forEach(message => {
+        let { to, from } = message;
+        to = to.toString();
+        from = from.toString();
+
+        const otherUser = userId.equals(from) ? to : from;
+        console.log(otherUser + " otherUser");
+        if (messagesPerUser.has(otherUser)) {
+            messagesPerUser.get(otherUser).push(message);
+        } else {
+            messagesPerUser.set(otherUser, [message]);
+        }
+    })
+
+    const matches = await matchStore.getMatches(userId);
+
+    await Promise.all(matches.map(async match => {
+        let { userId1, userId2 } = match;
+        userId1 = userId1.toString();
+        userId2 = userId2.toString();
+        const otherUser = userId.equals(userId1) ? userId2 : userId1;
+
+        const { username } = await User.findOne({ _id: otherUser }, { username: 1 });
+
+        users.push({
+            userId: otherUser,
+            username: username,
+            messages: messagesPerUser.get(otherUser) || [],
+        })
+
+    }))
+
+    console.log(users);
+    return users;
+
+}
 
 
 const port = process.env.port || 5000;
