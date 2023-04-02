@@ -1,30 +1,61 @@
 const mongoose = require('mongoose')
 const User = require('../models/user.js')
+const Swipe = require('../models/swipe');
 const get = async (req, res) => {
-    if (req.session) { console.log(req.session.cookie.userid) };
-    const { id } = req.params;
-
-    if (!mongoose.isValidObjectId(Number(id))) {
-        res.json({ status: 'error', error: "Incorrect user id" });
-        return;
-    }
     try {
-        const developer = await Developer.findOne({ userId: id });
+        const userId = req.userId;
+        const user = await User.findOne({ _id: userId });
+        //get the users already been swiped
+        let swipedList = await Swipe.find({ swipedBy: userId }, { _id: 0, swipedOn: 1 });
+        swipedList = swipedList.map(swipe => {
+            return swipe.swipedOn.toString();
+        })
+        console.log(swipedList);
+        const query = {
+            gender: user.genderInterestedIn,
+            genderInterestedIn: { $in: ["both", user.gender] },
+            _id: { $nin: [swipedList], $ne: userId },
+            location: {
 
-        if (!developer) {
-            res.json({ status: 'error', error: "Developer not found" });
+                $near:
+                {
+                    $geometry: user.location,
+                    $maxDistance: 80467.2
+                }
+
+            },
+            "$or":[{"interestedAgeRange.maxAge":{ $gte: user.age }},{"interestedAgeRange.maxAge":null}],
+            "$or":[{"interestedAgeRange.minAge":{ $lte: user.age }},{"interestedAgeRange.minAge":null}],
         }
-        else
-            res.json({ status: 'ok', data: developer });
+
+
+        if (!user?.name || !user?.genderInterestedIn || !user?.location) {
+            return res.json({ status: 'error', err: "user information incomplete" })
+        }
+
+        if (user?.interestedAgeRange) {
+            const maxAge = user?.interestedAgeRange?.maxAge;
+            const minAge = user?.interestedAgeRange?.minAge || 19;
+            if (maxAge) {
+                query.age = { $lte: maxAge, $gte: minAge }
+            } else {
+                query.age = { $gte: minAge }
+            }
+        }
+        console.log(query);
+        const users = await User.find(query).sort({ lastActive: -1 })
+
+        return res.json({ status: 'ok', users: users });
     } catch (err) {
-        res.json({ status: 'err', err: err });
+        console.log(err);
     }
 
 }
 
 const post = async (req, res) => {
     try {
-        const { userId, name, age, gender, genderInterestedIn, bio, location } = req.body;
+        const userId = req.userId;
+        const { name, age, gender, genderInterestedIn, bio, location } = req.body;
         if (!mongoose.isValidObjectId(userId)) {
             return res.json({ status: 'error', error: 'invalid user id' });
         }
@@ -51,7 +82,8 @@ const post = async (req, res) => {
 
 const patch = async (req, res) => {
     try {
-        const { userId, name, age, gender, genderInterestedIn, bio, location } = req.body;
+        const userId = req.userId;
+        const { name, age, gender, genderInterestedIn, bio, location, interestedAgeRange } = req.body;
 
         if (!mongoose.isValidObjectId(userId)) {
             return res.json({ status: 'error', error: 'invalid user id' });
@@ -83,6 +115,8 @@ const patch = async (req, res) => {
         }
         if (location) {
             update.location = location;
+        } if (interestedAgeRange) {
+            update.interestedAgeRange = interestedAgeRange
         }
 
         const user = await User.findOneAndUpdate(filter, update);
