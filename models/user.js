@@ -18,8 +18,23 @@ const UserSchema = new mongoose.Schema({
             type: [Number],
             required: true
         }
-    }
+    },
+    interestedAgeRange: {
+        minAge: {
+            type: Number,
+            default: 17,
+            required: true
+        },
+        maxAge: {
+            type: Number,
+            default: 100,
+            required: true
+        }
+    },
+    lastActive: { type: Date, default: Date.now() }
 }, { collection: 'users' });
+
+UserSchema.index({ location: "2dsphere" })
 
 const user = mongoose.model('user', UserSchema);
 
