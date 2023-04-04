@@ -31,7 +31,8 @@ const UserSchema = new mongoose.Schema({
             required: true
         }
     },
-    lastActive: { type: Date, default: Date.now() }
+    lastActive: { type: Date, default: Date.now() },
+    online: { type: Boolean, default: true }
 }, { collection: 'users' });
 
 UserSchema.index({ location: "2dsphere" })

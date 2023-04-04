@@ -103,6 +103,9 @@ io.on("connection", async (socket) => {
     socket.join(`room-${socket.userId}`);
     console.log(socket.userId + " joined the room")
 
+    //update status of user
+    userStore.updateUser(socket.userId, { online: true });
+
     //get matches not notified
     const { lastActive } = await User.findOne({ _id: socket.userId }, { lastActive: 1 });
     console.log(lastActive)
@@ -178,7 +181,7 @@ io.on("connection", async (socket) => {
 
         const now = new Date().toISOString();
 
-        await userStore.updateUser(socket.userId, { lastActive: now })
+        await userStore.updateUser(socket.userId, { lastActive: now, online: false })
         console.log(`socket disconnected due to ${reason}`)
     })
 
