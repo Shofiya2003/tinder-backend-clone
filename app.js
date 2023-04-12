@@ -1,6 +1,5 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const Developer = require('./models/userInfo');
 const mongoose = require('mongoose');
 const cookieSession = require('cookie-session')
 const { createServer } = require('http')
@@ -19,6 +18,7 @@ const userStore = require('./utils/userStore')
 
 const cors = require('cors');
 const message = require('./models/message');
+const { equal } = require('assert');
 require('dotenv').config()
 
 
@@ -170,11 +170,17 @@ io.on("connection", async (socket) => {
             message: content
         }
         console.log(to);
-        socket.to(`room-${to}`).emit("private message", message)
+        const newMessage = await messageStore.createMessage(socket.userId, to, content)
+        socket.to(`room-${to}`).emit("private message", newMessage)
 
-        socket.emit("private message", message)
-        await messageStore.createMessage(socket.userId, to, content)
+        socket.emit("private message", newMessage)
 
+
+    })
+
+    socket.on("mark as read", async ({ from }) => {
+        await messageStore.markAsRead(from, socket.userId)
+        socket.to(`room-${from}`).emit("read", { userId: socket.userId })
     })
 
     socket.on("disconnect", async (reason) => {
@@ -202,7 +208,7 @@ const getUserMessages = async (userId) => {
         let { to, from } = message;
         to = to.toString();
         from = from.toString();
-
+        console.log(userId === from)
         const otherUser = userId.equals(from) ? to : from;
         console.log(otherUser + " otherUser");
         if (messagesPerUser.has(otherUser)) {
