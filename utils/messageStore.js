@@ -34,6 +34,10 @@ class MessageStore {
             throw new Error(err.message)
         }
     }
+
+    async markAsDelivered(messageId) {
+        await Message.updateOne({ _id: messageId }, { delivered: true });
+    }
 }
 
 module.exports = new MessageStore()

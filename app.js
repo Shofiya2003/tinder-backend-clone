@@ -126,8 +126,22 @@ io.on("connection", async (socket) => {
         })
     }
 
-    const users = await getUserMessages(socket.userId);
-    socket.emit("chats", users)
+    const users = await getUserMessages(socket.userId, socket);
+
+    if (await userStore.checkStatus(socket.userId)) {
+
+        socket.emit("chats", users)
+        users.map(user => {
+            const userId = user.userId;
+            const messages = user.messages;
+            messages.map(async message => {
+                if (message.from.equals(userId) && !message.delivered) {
+
+                }
+            })
+        })
+    }
+
 
 
     //listen for swipe right
@@ -164,17 +178,27 @@ io.on("connection", async (socket) => {
     socket.on("private message", async ({ content, to }) => {
 
         //check match
-        const message = {
-            from: socket.userId,
-            to: to,
-            message: content
-        }
-        console.log(to);
+        //log the message in the database
         const newMessage = await messageStore.createMessage(socket.userId, to, content)
-        socket.to(`room-${to}`).emit("private message", newMessage)
+
+        //check if other user is online
+        if (await userStore.checkStatus(to)) {
+            socket.timeout(5000).to(`room-${to}`).emit("private message", newMessage, async (err, response) => {
+                console.log("I am here")
+                console.log(response);
+                //if the client sends ack
+                if (!err) {
+                    await messageStore.markAsDelivered(newMessage._id);
+                    socket.emit("delivered", { messageId: newMessage._id });
+                } else {
+                    console.log(err);
+                }
+            })
+        } else {
+            console.log("User is not online")
+        }
 
         socket.emit("private message", newMessage)
-
 
     })
 
@@ -186,7 +210,7 @@ io.on("connection", async (socket) => {
     socket.on("disconnect", async (reason) => {
 
         const now = new Date().toISOString();
-
+        console.log(socket.username + " disconnected");
         await userStore.updateUser(socket.userId, { lastActive: now, online: false })
         console.log(`socket disconnected due to ${reason}`)
     })
@@ -199,18 +223,27 @@ mongoose.connect('mongodb://localhost:27017/findyoursimrandatabase', () => {
     console.log("connected to db");
 });
 
-const getUserMessages = async (userId) => {
+const getUserMessages = async (userId, socket) => {
     const users = [];
     const messagesPerUser = new Map();
     const messages = await messageStore.getAllUserMessages(userId)
 
-    messages.forEach(message => {
+    messages.forEach(async (message) => {
         let { to, from } = message;
+
         to = to.toString();
         from = from.toString();
-        console.log(userId === from)
+
         const otherUser = userId.equals(from) ? to : from;
-        console.log(otherUser + " otherUser");
+
+        // inform the other user that message has been delivered and mark the message delivered in the database
+        if (userId.equals(to) && !message.delivered) {
+            console.log(message, "message deliverd");
+            socket.to(`room-${otherUser}`).emit("delivered", { messageId: message._id });
+            await messageStore.markAsDelivered(message._id)
+            message.delivered = true;
+        }
+
         if (messagesPerUser.has(otherUser)) {
             messagesPerUser.get(otherUser).push(message);
         } else {
@@ -240,7 +273,6 @@ const getUserMessages = async (userId) => {
     return users;
 
 }
-
 
 const port = process.env.port || 5000;
 httpServer.listen(port, () => {
