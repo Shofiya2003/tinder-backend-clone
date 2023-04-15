@@ -17,10 +17,7 @@ const User = require('./models/user')
 const userStore = require('./utils/userStore')
 
 const cors = require('cors');
-const message = require('./models/message');
-const { equal } = require('assert');
 require('dotenv').config()
-
 
 
 const app = express();
@@ -183,11 +180,12 @@ io.on("connection", async (socket) => {
 
         //check if other user is online
         if (await userStore.checkStatus(to)) {
-            socket.timeout(5000).to(`room-${to}`).emit("private message", newMessage, async (err, response) => {
-                console.log("I am here")
+            let deliveredMessage = newMessage;
+
+            socket.to(`room-${to}`).emit("private message", { ...deliveredMessage["_doc"], delivered: true }, async (err, response) => {
                 console.log(response);
-                //if the client sends ack
-                if (!err) {
+                //if the client sends ack, send delivered event to the socket that sent the message
+                if (response) {
                     await messageStore.markAsDelivered(newMessage._id);
                     socket.emit("delivered", { messageId: newMessage._id });
                 } else {
@@ -198,6 +196,7 @@ io.on("connection", async (socket) => {
             console.log("User is not online")
         }
 
+        //emit private message event for the user's socket
         socket.emit("private message", newMessage)
 
     })
