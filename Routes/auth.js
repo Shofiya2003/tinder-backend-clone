@@ -8,8 +8,9 @@ const User = require('../models/user')
 
 router.post('/signin', async (req, res) => {
     try {
-
+        console.log(req.body)
         const { username, password } = req.body
+        console.log(username + " " + password);
         const user = await User.findOne({ username }).lean();
         if (!user) {
             return res.json({ status: 'error', error: 'Invalid username or password' });
@@ -30,10 +31,10 @@ router.post('/signin', async (req, res) => {
             console.log(req.session);
             req.session.userId = user._id;
             req.session.token = token
-            res.json({ status: 'ok',token:token,userId:user._id,username:user.username });
+            res.json({ status: 'ok', token: token, userId: user._id, username: user.username });
         }
         else {
-           
+
             res.status(400).json({ status: 'error', error: 'Invalid username or password' });
         }
     } catch (err) {
