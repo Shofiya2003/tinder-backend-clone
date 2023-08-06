@@ -1,12 +1,13 @@
 const Message = require('../models/message')
 
 class MessageStore {
-    async createMessage(from, to, content) {
+    async createMessage(from, to, content,type) {
         try {
             const message = await Message.create({
                 from: from,
                 to: to,
-                message: content
+                message: content,
+                type: type
             })
             console.log(message)
             return message
